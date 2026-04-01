@@ -1,0 +1,4 @@
+id,name,client,status,priority,start_date,end_date,pm,contract_status,original_work_start,actual_work_start,delay_note,budget_this_fy,budget_next_fy,note
+P001,A社基幹システム刷新,A株式会社,in_progress,high,2026-04-01,2027-03-31,M001,signed,2026-04-01,2026-04-01,,,,
+P002,B社会計システム導入,B株式会社,planned,high,2026-04-01,2027-03-31,M001,delayed,2026-04-01,2026-08-01,先方の社内稟議が遅延。8月締結見込み,,,
+P003,C社ECサイト構築,C株式会社,in_progress,medium,2026-10-01,2027-09-30,M002,signed,2026-10-01,2026-10-01,,8000000,9000000,
