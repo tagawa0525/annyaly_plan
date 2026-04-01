@@ -1,0 +1,8 @@
+id,project_id,name,due_date,status,completion_pct
+P001-MS01,P001,要件定義完了,2026-06-30,in_progress,30
+P001-MS02,P001,基本設計完了,2026-09-30,not_started,0
+P001-MS03,P001,結合テスト完了,2027-01-31,not_started,0
+P002-MS01,P002,要件定義完了,2026-10-31,not_started,0
+P002-MS02,P002,基本設計完了,2027-01-31,not_started,0
+P003-MS01,P003,要件定義完了,2026-12-31,not_started,0
+P003-MS02,P003,リリース,2027-06-30,not_started,0
