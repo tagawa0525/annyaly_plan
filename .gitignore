@@ -1,6 +1,9 @@
 # SQLite database (binary, tracked via CSV exports)
 *.db
 
+# Generated reports (regenerated from DB)
+reports/monthly/*.md
+
 # Python
 __pycache__/
 *.pyc
