@@ -26,16 +26,25 @@ TABLES = [
 ]
 
 
+def get_primary_key_columns(conn: sqlite3.Connection, table: str) -> list[str]:
+    table_info = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    return [row[1] for row in sorted(table_info, key=lambda r: r[5]) if row[5] > 0]
+
+
 def export_table(conn: sqlite3.Connection, table: str) -> None:
-    cursor = conn.execute(f"SELECT * FROM {table}")  # noqa: S608
+    pk_cols = get_primary_key_columns(conn, table)
+    query = f"SELECT * FROM {table}"  # noqa: S608
+    if pk_cols:
+        query += f" ORDER BY {', '.join(pk_cols)}"
+    cursor = conn.execute(query)
     columns = [desc[0] for desc in cursor.description]
-    rows = cursor.fetchall()
 
     path = EXPORT_DIR / f"{table}.csv"
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(columns)
-        writer.writerows(rows)
+        for row in cursor:
+            writer.writerow(row)
 
 
 def main() -> None:
