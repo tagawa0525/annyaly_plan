@@ -209,7 +209,8 @@ def init_db() -> None:
         conn.commit()
         print(f"Database initialized: {DB_PATH}")
     except Exception:
-        conn.rollback()
+        if conn.in_transaction:
+            conn.rollback()
         raise
     finally:
         conn.close()

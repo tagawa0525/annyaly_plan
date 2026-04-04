@@ -7,9 +7,8 @@ DB_PATH = Path(__file__).resolve().parent.parent / "data" / "project_mgmt.db"
 
 
 def seed(conn: sqlite3.Connection) -> None:
+    # 再実行可能にするため、FK無効化して全データ削除後にコミット
     conn.execute("PRAGMA foreign_keys = OFF")
-
-    # 再実行可能にするため、子テーブルから順に全データ削除
     for table in [
         "progress",
         "budget_actual",
@@ -27,7 +26,9 @@ def seed(conn: sqlite3.Connection) -> None:
         "fiscal_year",
     ]:
         conn.execute(f"DELETE FROM {table}")
+    conn.commit()
 
+    # FK有効化はトランザクション外でないと反映されない
     conn.execute("PRAGMA foreign_keys = ON")
 
     # --- 年度設定 ---
