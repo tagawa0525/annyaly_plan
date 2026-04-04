@@ -10,6 +10,13 @@ from utils.kpi import utilization_by_member
 
 def optimize(year_month: str) -> None:
     conn = connect()
+    try:
+        _optimize_impl(conn, year_month)
+    finally:
+        conn.close()
+
+
+def _optimize_impl(conn, year_month: str) -> None:
 
     # 1. スキルギャップ分析
     print(f"\n=== スキルギャップ分析 ({year_month}) ===")
@@ -77,7 +84,7 @@ def optimize(year_month: str) -> None:
                     cd = dict(c)
                     print(
                         f"    候補: {cd['name']} ({cd['level']}) "
-                        f"現稼働率 {cd['current_alloc'] * 100:.0f}%"
+                        f"現割当 {cd['current_alloc'] * 100:.0f}%"
                     )
             else:
                 print("    候補なし（外部リソースの検討を推奨）")
@@ -88,7 +95,7 @@ def optimize(year_month: str) -> None:
     print(f"\n=== 稼働バランス ({year_month}) ===")
     members = utilization_by_member(conn, year_month)
     overloaded = [m for m in members if m["utilization_rate"] > 0.95]
-    underloaded = [m for m in members if 0 < m["utilization_rate"] < 0.5]
+    underloaded = [m for m in members if m["utilization_rate"] < 0.5]
 
     if overloaded and underloaded:
         print("  再配置提案:")
@@ -108,8 +115,6 @@ def optimize(year_month: str) -> None:
             )
     else:
         print("  バランス良好")
-
-    conn.close()
 
 
 def main() -> None:
