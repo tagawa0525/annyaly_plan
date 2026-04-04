@@ -18,8 +18,26 @@ from alerts import run_all_alerts
 REPORT_DIR = Path(__file__).resolve().parent.parent / "reports" / "monthly"
 
 
+def _fiscal_year_from_month(year_month: str) -> int:
+    year, month = int(year_month[:4]), int(year_month[5:7])
+    return year if month >= 4 else year - 1
+
+
 def generate_report(year_month: str) -> str:
+    import re
+
+    if not re.match(r"^\d{4}-(0[1-9]|1[0-2])$", year_month):
+        raise ValueError(f"無効な年月フォーマット: {year_month}")
+
     conn = connect()
+    try:
+        return _generate_report_impl(conn, year_month)
+    finally:
+        conn.close()
+
+
+def _generate_report_impl(conn, year_month: str) -> str:
+    fiscal_year = _fiscal_year_from_month(year_month)
 
     dept_rate = dept_utilization(conn, year_month)
     members = utilization_by_member(conn, year_month)
@@ -28,7 +46,9 @@ def generate_report(year_month: str) -> str:
     compressed = compression_ratio(conn)
     alerts = run_all_alerts(conn, year_month)
 
-    fy = conn.execute("SELECT * FROM fiscal_year WHERE fiscal_year = 2026").fetchone()
+    fy = conn.execute(
+        "SELECT * FROM fiscal_year WHERE fiscal_year = ?", (fiscal_year,)
+    ).fetchone()
     revenue_target = dict(fy)["revenue_target"] if fy else 0
 
     total_planned_revenue = conn.execute(
@@ -100,10 +120,14 @@ def generate_report(year_month: str) -> str:
             gap = g["gap"]
             expected = g["expected_completion_pct"]
             status = (
-                "要対策" if gap and gap > 30 else "警告" if gap and gap > 15 else "順調"
+                "要対策"
+                if gap is not None and gap > 30
+                else "警告"
+                if gap is not None and gap > 15
+                else "順調"
             )
             gap_str = (
-                f"+{gap:.0f}pt" if gap and gap > 0 else f"{gap:.0f}pt" if gap else "-"
+                "-" if gap is None else f"+{gap:.0f}pt" if gap > 0 else f"{gap:.0f}pt"
             )
             lines.append(
                 f"| {g['project_name']} | {pct}% | {expected:.0f}% | {gap_str} | {status} |"
@@ -143,7 +167,6 @@ def generate_report(year_month: str) -> str:
     lines.append("<!-- Claude Code が分析結果に基づき記入 -->")
     lines.append("")
 
-    conn.close()
     return "\n".join(lines)
 
 
