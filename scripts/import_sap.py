@@ -58,9 +58,13 @@ def import_csv(year_month: str, csv_path: str) -> None:
 
 def main() -> None:
     if len(sys.argv) < 3:
-        print("Usage: python import_sap.py YYYY-MM file.csv")
+        print("Usage: python import_sap.py YYYY-MM file.csv", file=sys.stderr)
         sys.exit(1)
-    import_csv(sys.argv[1], sys.argv[2])
+    try:
+        import_csv(sys.argv[1], sys.argv[2])
+    except (FileNotFoundError, ValueError) as e:
+        print(f"エラー: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
