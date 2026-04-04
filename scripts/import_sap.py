@@ -62,7 +62,7 @@ def main() -> None:
         sys.exit(1)
     try:
         import_csv(sys.argv[1], sys.argv[2])
-    except (FileNotFoundError, ValueError) as e:
+    except Exception as e:
         print(f"エラー: {e}", file=sys.stderr)
         sys.exit(1)
 
