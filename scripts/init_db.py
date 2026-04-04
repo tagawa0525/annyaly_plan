@@ -202,12 +202,17 @@ JOIN monthly_calendar cal ON aa.year_month = cal.year_month;
 def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.executescript(DDL)
-    conn.executescript(VIEWS)
-    conn.commit()
-    conn.close()
-    print(f"Database initialized: {DB_PATH}")
+    try:
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.executescript(DDL)
+        conn.executescript(VIEWS)
+        conn.commit()
+        print(f"Database initialized: {DB_PATH}")
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":

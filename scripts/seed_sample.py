@@ -7,11 +7,32 @@ DB_PATH = Path(__file__).resolve().parent.parent / "data" / "project_mgmt.db"
 
 
 def seed(conn: sqlite3.Connection) -> None:
+    conn.execute("PRAGMA foreign_keys = OFF")
+
+    # 再実行可能にするため、子テーブルから順に全データ削除
+    for table in [
+        "progress",
+        "budget_actual",
+        "budget_plan",
+        "assignments_actual",
+        "assignments_plan",
+        "milestones",
+        "project_required_skills",
+        "project_budgets",
+        "member_capacity",
+        "member_skills",
+        "projects",
+        "members",
+        "monthly_calendar",
+        "fiscal_year",
+    ]:
+        conn.execute(f"DELETE FROM {table}")
+
     conn.execute("PRAGMA foreign_keys = ON")
 
     # --- 年度設定 ---
     conn.execute("""
-        INSERT OR REPLACE INTO fiscal_year VALUES
+        INSERT INTO fiscal_year VALUES
         (2026, '2026-04-01', '2027-03-31', 200000000, 15)
     """)
 
@@ -31,7 +52,7 @@ def seed(conn: sqlite3.Connection) -> None:
         ("2027-03", 22),  # 3月
     ]
     conn.executemany(
-        "INSERT OR REPLACE INTO monthly_calendar (year_month, working_days) VALUES (?, ?)",
+        "INSERT INTO monthly_calendar (year_month, working_days) VALUES (?, ?)",
         calendar,
     )
 
@@ -85,7 +106,7 @@ def seed(conn: sqlite3.Connection) -> None:
     ]
     conn.executemany(
         """
-        INSERT OR REPLACE INTO members
+        INSERT INTO members
         (id, name, type, role, grade, unit_cost, hourly_rate, max_capacity,
          avg_overtime_hours, join_date, contract_start, contract_end, note)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -104,7 +125,7 @@ def seed(conn: sqlite3.Connection) -> None:
         ("D001", "Java", "mid"),
         ("D001", "SQL", "mid"),
     ]
-    conn.executemany("INSERT OR REPLACE INTO member_skills VALUES (?, ?, ?)", skills)
+    conn.executemany("INSERT INTO member_skills VALUES (?, ?, ?)", skills)
 
     # --- メンバーキャパシティ（12ヶ月分） ---
     capacity_rows = []
@@ -122,7 +143,7 @@ def seed(conn: sqlite3.Connection) -> None:
             capacity_rows.append(("D001", ym, 0, 0))
 
     conn.executemany(
-        "INSERT OR REPLACE INTO member_capacity VALUES (?, ?, ?, ?)",
+        "INSERT INTO member_capacity VALUES (?, ?, ?, ?)",
         capacity_rows,
     )
 
@@ -185,7 +206,7 @@ def seed(conn: sqlite3.Connection) -> None:
     ]
     conn.executemany(
         """
-        INSERT OR REPLACE INTO projects
+        INSERT INTO projects
         (id, name, client, status, priority, start_date, end_date, pm,
          contract_status, original_work_start, actual_work_start, delay_note,
          budget_this_fy, budget_next_fy, note)
@@ -201,7 +222,7 @@ def seed(conn: sqlite3.Connection) -> None:
         ("P003", 10000000, 5000000, 2000000),  # total: 17,000,000
     ]
     conn.executemany(
-        "INSERT OR REPLACE INTO project_budgets (project_id, labor_cost, outsource_cost, expense) VALUES (?, ?, ?, ?)",
+        "INSERT INTO project_budgets (project_id, labor_cost, outsource_cost, expense) VALUES (?, ?, ?, ?)",
         budgets,
     )
 
@@ -216,7 +237,7 @@ def seed(conn: sqlite3.Connection) -> None:
         ("P003", "SQL", "mid", 1),
     ]
     conn.executemany(
-        "INSERT OR REPLACE INTO project_required_skills VALUES (?, ?, ?, ?)",
+        "INSERT INTO project_required_skills VALUES (?, ?, ?, ?)",
         required_skills,
     )
 
@@ -231,7 +252,7 @@ def seed(conn: sqlite3.Connection) -> None:
         ("P003-MS02", "P003", "リリース", "2027-06-30", "not_started", 0),
     ]
     conn.executemany(
-        "INSERT OR REPLACE INTO milestones VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO milestones VALUES (?, ?, ?, ?, ?, ?)",
         milestones,
     )
 
@@ -257,7 +278,7 @@ def seed(conn: sqlite3.Connection) -> None:
             plan_rows.append(("D001", "P001", ym, 1.0, "SE"))
 
     conn.executemany(
-        "INSERT OR REPLACE INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
         plan_rows,
     )
 
@@ -276,7 +297,7 @@ def seed(conn: sqlite3.Connection) -> None:
             budget_plan_rows.append(("P003", ym, 830000, 420000, 170000, 1600000))
 
     conn.executemany(
-        "INSERT OR REPLACE INTO budget_plan VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO budget_plan VALUES (?, ?, ?, ?, ?, ?)",
         budget_plan_rows,
     )
 
@@ -288,7 +309,7 @@ def seed(conn: sqlite3.Connection) -> None:
         ("M002", "P001", "2026-04", 140, "SE", "teamspirit", None),
     ]
     conn.executemany(
-        "INSERT OR REPLACE INTO assignments_actual VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO assignments_actual VALUES (?, ?, ?, ?, ?, ?, ?)",
         actual_assignments,
     )
 
@@ -297,7 +318,7 @@ def seed(conn: sqlite3.Connection) -> None:
         ("P001", "2026-04", 800000, 280000, 150000, "sap", None),
     ]
     conn.executemany(
-        "INSERT OR REPLACE INTO budget_actual VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO budget_actual VALUES (?, ?, ?, ?, ?, ?, ?)",
         actual_budget,
     )
 
@@ -306,7 +327,7 @@ def seed(conn: sqlite3.Connection) -> None:
         ("P001", "2026-04", 8, "要件定義進行中"),
     ]
     conn.executemany(
-        "INSERT OR REPLACE INTO progress VALUES (?, ?, ?, ?)",
+        "INSERT INTO progress VALUES (?, ?, ?, ?)",
         progress_rows,
     )
 
