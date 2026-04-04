@@ -28,12 +28,15 @@ def utilization_by_member(conn: sqlite3.Connection, year_month: str) -> list[dic
             m.name,
             m.type,
             COALESCE(a.total_allocation, p.total_allocation, 0) AS total_allocation,
-            COALESCE(vc.effective_capacity, m.max_capacity) AS effective_capacity,
-            ROUND(
-                COALESCE(a.total_allocation, p.total_allocation, 0)
-                / COALESCE(vc.effective_capacity, m.max_capacity),
-                3
-            ) AS utilization_rate,
+            COALESCE(vc.effective_capacity, m.max_capacity, 0) AS effective_capacity,
+            CASE
+                WHEN COALESCE(vc.effective_capacity, m.max_capacity, 0) <= 0 THEN 0.0
+                ELSE ROUND(
+                    COALESCE(a.total_allocation, p.total_allocation, 0)
+                    / COALESCE(vc.effective_capacity, m.max_capacity, 0),
+                    3
+                )
+            END AS utilization_rate,
             CASE
                 WHEN a.total_allocation IS NOT NULL THEN 'actual'
                 WHEN p.total_allocation IS NOT NULL THEN 'plan'
@@ -130,28 +133,37 @@ def progress_gap(conn: sqlite3.Connection, year_month: str) -> list[dict]:
             p.contract_status,
             pr.overall_completion_pct,
             -- 実質経過率
-            ROUND(
-                CAST(julianday(? || '-01') - julianday(p.actual_work_start) AS REAL)
-                / (julianday(p.end_date) - julianday(p.actual_work_start)),
-                3
-            ) AS elapsed_rate,
+            CASE
+                WHEN (julianday(p.end_date) - julianday(p.actual_work_start)) <= 0 THEN NULL
+                ELSE ROUND(
+                    CAST(julianday(? || '-01') - julianday(p.actual_work_start) AS REAL)
+                    / (julianday(p.end_date) - julianday(p.actual_work_start)),
+                    3
+                )
+            END AS elapsed_rate,
             -- 期待完了率
-            ROUND(
-                CAST(julianday(? || '-01') - julianday(p.actual_work_start) AS REAL)
-                / (julianday(p.end_date) - julianday(p.actual_work_start)) * 100,
-                1
-            ) AS expected_completion_pct,
+            CASE
+                WHEN (julianday(p.end_date) - julianday(p.actual_work_start)) <= 0 THEN NULL
+                ELSE ROUND(
+                    CAST(julianday(? || '-01') - julianday(p.actual_work_start) AS REAL)
+                    / (julianday(p.end_date) - julianday(p.actual_work_start)) * 100,
+                    1
+                )
+            END AS expected_completion_pct,
             -- 乖離
-            ROUND(
-                CAST(julianday(? || '-01') - julianday(p.actual_work_start) AS REAL)
-                / (julianday(p.end_date) - julianday(p.actual_work_start)) * 100
-                - pr.overall_completion_pct,
-                1
-            ) AS gap
+            CASE
+                WHEN (julianday(p.end_date) - julianday(p.actual_work_start)) <= 0 THEN NULL
+                ELSE ROUND(
+                    CAST(julianday(? || '-01') - julianday(p.actual_work_start) AS REAL)
+                    / (julianday(p.end_date) - julianday(p.actual_work_start)) * 100
+                    - pr.overall_completion_pct,
+                    1
+                )
+            END AS gap
         FROM projects p
         LEFT JOIN progress pr ON p.id = pr.project_id AND pr.year_month = ?
         WHERE p.status IN ('in_progress', 'planned')
-          AND p.actual_work_start <= ? || '-31'
+          AND p.actual_work_start <= date(? || '-01', '+1 month', '-1 day')
         ORDER BY gap DESC
     """,
         (year_month, year_month, year_month, year_month, year_month),
@@ -168,11 +180,14 @@ def compression_ratio(conn: sqlite3.Connection) -> list[dict]:
             original_work_start,
             actual_work_start,
             end_date,
-            ROUND(
-                (julianday(end_date) - julianday(original_work_start))
-                / (julianday(end_date) - julianday(actual_work_start)),
-                2
-            ) AS ratio,
+            CASE
+                WHEN (julianday(end_date) - julianday(actual_work_start)) <= 0 THEN NULL
+                ELSE ROUND(
+                    (julianday(end_date) - julianday(original_work_start))
+                    / (julianday(end_date) - julianday(actual_work_start)),
+                    2
+                )
+            END AS ratio,
             delay_note
         FROM projects
         WHERE contract_status = 'delayed'
@@ -181,15 +196,18 @@ def compression_ratio(conn: sqlite3.Connection) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def revenue_forecast(conn: sqlite3.Connection) -> dict:
+def revenue_forecast(conn: sqlite3.Connection, fiscal_year: int = 2026) -> dict:
     """売上着地予測"""
-    row = conn.execute("""
+    row = conn.execute(
+        """
         SELECT
             fy.revenue_target,
             COALESCE(SUM(bp.planned_revenue), 0) AS total_planned_revenue,
             ROUND(CAST(COALESCE(SUM(bp.planned_revenue), 0) AS REAL) / fy.revenue_target, 3) AS achievement_rate
         FROM fiscal_year fy
         LEFT JOIN budget_plan bp ON 1=1
-        WHERE fy.fiscal_year = 2026
-    """).fetchone()
+        WHERE fy.fiscal_year = ?
+    """,
+        (fiscal_year,),
+    ).fetchone()
     return dict(row) if row else {}

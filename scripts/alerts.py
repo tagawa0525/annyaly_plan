@@ -1,4 +1,4 @@
-"""アラート検出（14種）"""
+"""アラート検出"""
 
 import sqlite3
 import sys
@@ -17,6 +17,8 @@ def check_overloaded(conn: sqlite3.Connection, year_month: str) -> list[dict]:
     alerts = []
     for m in utilization_by_member(conn, year_month):
         rate = m["utilization_rate"]
+        if rate is None:
+            continue
         if rate > 1.0:
             alerts.append(
                 {
@@ -56,18 +58,18 @@ def check_underloaded(conn: sqlite3.Connection, year_month: str) -> list[dict]:
     return alerts
 
 
-def check_budget_overrun(conn: sqlite3.Connection) -> list[dict]:
+def check_budget_overrun(conn: sqlite3.Connection, year_month: str) -> list[dict]:
     """#7 予算超過ペース / #13 外注費超過"""
     alerts = []
-    today = _today()
-    fy_start = "2026-04-01"
+    target_month = date.fromisoformat(f"{year_month}-01")
+    fiscal_start_year = (
+        target_month.year if target_month.month >= 4 else target_month.year - 1
+    )
     elapsed_months = max(
         1,
-        (int(today[:4]) - int(fy_start[:4])) * 12
-        + int(today[5:7])
-        - int(fy_start[5:7]),
+        (target_month.year - fiscal_start_year) * 12 + target_month.month - 4 + 1,
     )
-    time_rate = elapsed_months / 12.0
+    time_rate = min(elapsed_months, 12) / 12.0
 
     for b in budget_burn(conn):
         if b["budget_total"] == 0:
@@ -102,6 +104,8 @@ def check_compression(conn: sqlite3.Connection) -> list[dict]:
     alerts = []
     for c in compression_ratio(conn):
         ratio = c["ratio"]
+        if ratio is None:
+            continue
         if ratio > 2.0:
             alerts.append(
                 {
@@ -158,7 +162,7 @@ def check_unassigned_projects(conn: sqlite3.Connection, year_month: str) -> list
         SELECT p.id, p.name
         FROM projects p
         WHERE p.status IN ('in_progress', 'planned')
-          AND p.actual_work_start <= ? || '-31'
+          AND p.actual_work_start <= date(? || '-01', '+1 month', '-1 day')
           AND p.id NOT IN (
               SELECT DISTINCT project_id FROM assignments_plan WHERE year_month = ?
           )
@@ -186,7 +190,8 @@ def check_unassigned_members(conn: sqlite3.Connection, year_month: str) -> list[
             SELECT DISTINCT member_id FROM assignments_plan WHERE year_month = ?
         )
         AND (m.type = 'internal'
-             OR (m.contract_start <= ? || '-31' AND m.contract_end >= ? || '-01'))
+             OR (m.contract_start <= date(? || '-01', '+1 month', '-1 day')
+                 AND m.contract_end >= ? || '-01'))
     """,
         (year_month, year_month, year_month),
     ).fetchall()
@@ -289,7 +294,7 @@ def run_all_alerts(conn: sqlite3.Connection, year_month: str) -> list[dict]:
     all_alerts = []
     all_alerts.extend(check_overloaded(conn, year_month))
     all_alerts.extend(check_underloaded(conn, year_month))
-    all_alerts.extend(check_budget_overrun(conn))
+    all_alerts.extend(check_budget_overrun(conn, year_month))
     all_alerts.extend(check_compression(conn))
     all_alerts.extend(check_milestone_delay(conn))
     all_alerts.extend(check_unassigned_projects(conn, year_month))

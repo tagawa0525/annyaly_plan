@@ -1,9 +1,6 @@
 """メイン分析スクリプト"""
 
 import argparse
-import sys
-
-sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
 
 from utils.db import connect
 from utils.kpi import (
@@ -129,18 +126,22 @@ def analyze(year_month: str) -> None:
             table.append([g["project_name"], "-", "-", "-", g["contract_status"]])
         else:
             status = (
-                "要対策" if gap and gap > 30 else "警告" if gap and gap > 15 else "順調"
+                "要対策"
+                if gap is not None and gap > 30
+                else "警告"
+                if gap is not None and gap > 15
+                else "順調"
             )
             table.append(
                 [
                     g["project_name"],
                     f"{pct}%",
-                    f"{expected:.0f}%" if expected else "-",
-                    f"+{gap:.0f}pt"
-                    if gap and gap > 0
-                    else f"{gap:.0f}pt"
-                    if gap
-                    else "-",
+                    f"{expected:.0f}%" if expected is not None else "-",
+                    "-"
+                    if gap is None
+                    else f"+{gap:.0f}pt"
+                    if gap > 0
+                    else f"{gap:.0f}pt",
                     status,
                 ]
             )
