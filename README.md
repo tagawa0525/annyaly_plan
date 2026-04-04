@@ -19,6 +19,9 @@
 ```bash
 pip install -r requirements.txt
 python scripts/init_db.py
+
+# 動作確認用のサンプルデータ投入（任意）
+python scripts/seed_sample.py
 ```
 
 ## 月次運用
