@@ -132,20 +132,20 @@ def progress_gap(conn: sqlite3.Connection, year_month: str) -> list[dict]:
             p.end_date,
             p.contract_status,
             pr.overall_completion_pct,
-            -- 実質経過率
+            -- 実質経過率（月末基準）
             CASE
                 WHEN (julianday(p.end_date) - julianday(p.actual_work_start)) <= 0 THEN NULL
                 ELSE ROUND(
-                    CAST(julianday(? || '-01') - julianday(p.actual_work_start) AS REAL)
+                    CAST(julianday(date(? || '-01', '+1 month', '-1 day')) - julianday(p.actual_work_start) AS REAL)
                     / (julianday(p.end_date) - julianday(p.actual_work_start)),
                     3
                 )
             END AS elapsed_rate,
-            -- 期待完了率
+            -- 期待完了率（月末基準）
             CASE
                 WHEN (julianday(p.end_date) - julianday(p.actual_work_start)) <= 0 THEN NULL
                 ELSE ROUND(
-                    CAST(julianday(? || '-01') - julianday(p.actual_work_start) AS REAL)
+                    CAST(julianday(date(? || '-01', '+1 month', '-1 day')) - julianday(p.actual_work_start) AS REAL)
                     / (julianday(p.end_date) - julianday(p.actual_work_start)) * 100,
                     1
                 )
@@ -154,7 +154,7 @@ def progress_gap(conn: sqlite3.Connection, year_month: str) -> list[dict]:
             CASE
                 WHEN (julianday(p.end_date) - julianday(p.actual_work_start)) <= 0 THEN NULL
                 ELSE ROUND(
-                    CAST(julianday(? || '-01') - julianday(p.actual_work_start) AS REAL)
+                    CAST(julianday(date(? || '-01', '+1 month', '-1 day')) - julianday(p.actual_work_start) AS REAL)
                     / (julianday(p.end_date) - julianday(p.actual_work_start)) * 100
                     - pr.overall_completion_pct,
                     1
@@ -203,9 +203,13 @@ def revenue_forecast(conn: sqlite3.Connection, fiscal_year: int = 2026) -> dict:
         SELECT
             fy.revenue_target,
             COALESCE(SUM(bp.planned_revenue), 0) AS total_planned_revenue,
-            ROUND(CAST(COALESCE(SUM(bp.planned_revenue), 0) AS REAL) / fy.revenue_target, 3) AS achievement_rate
+            CASE
+                WHEN fy.revenue_target <= 0 THEN NULL
+                ELSE ROUND(CAST(COALESCE(SUM(bp.planned_revenue), 0) AS REAL) / fy.revenue_target, 3)
+            END AS achievement_rate
         FROM fiscal_year fy
-        LEFT JOIN budget_plan bp ON 1=1
+        LEFT JOIN budget_plan bp
+            ON bp.year_month >= fy.period_start AND bp.year_month <= substr(fy.period_end, 1, 7)
         WHERE fy.fiscal_year = ?
     """,
         (fiscal_year,),
