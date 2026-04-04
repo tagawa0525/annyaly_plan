@@ -1,0 +1,3 @@
+member_id,project_id,year_month,actual_hours,role_in_project,source,note
+M001,P001,2026-04,88.0,PM,teamspirit,
+M002,P001,2026-04,140.0,SE,teamspirit,

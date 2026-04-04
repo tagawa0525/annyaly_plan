@@ -1,0 +1,4 @@
+id,name,type,role,grade,unit_cost,hourly_rate,max_capacity,avg_overtime_hours,join_date,contract_start,contract_end,note
+M001,田中太郎,internal,PM,senior,800000,,1.0,20.0,2020-04-01,,,
+M002,佐藤次郎,internal,SE,mid,600000,,1.0,10.0,2022-04-01,,,
+D001,鈴木花子,dispatch,SE,mid,650000,4000,1.0,0.0,,2026-06-01,2027-03-31,A社向け増員
