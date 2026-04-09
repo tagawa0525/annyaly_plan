@@ -7,8 +7,10 @@ DB_PATH = Path(__file__).resolve().parent.parent / "data" / "project_mgmt.db"
 
 
 def seed(conn: sqlite3.Connection) -> None:
-    # 再実行可能にするため、FK無効化して全データ削除後にコミット
-    conn.execute("PRAGMA foreign_keys = OFF")
+    conn.execute("PRAGMA foreign_keys = ON")
+
+    # 再実行可能にするため、子→親の順で全データ削除（FK有効のまま）
+    # DELETE + INSERT を1トランザクションで実行し、失敗時は全体rollback
     for table in [
         "progress",
         "budget_actual",
@@ -26,10 +28,6 @@ def seed(conn: sqlite3.Connection) -> None:
         "fiscal_year",
     ]:
         conn.execute(f"DELETE FROM {table}")
-    conn.commit()
-
-    # FK有効化はトランザクション外でないと反映されない
-    conn.execute("PRAGMA foreign_keys = ON")
 
     # --- 年度設定 ---
     conn.execute("""
