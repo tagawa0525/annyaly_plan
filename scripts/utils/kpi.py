@@ -66,13 +66,34 @@ def dept_utilization(conn: sqlite3.Connection, year_month: str) -> float:
     return round(sum(rates) / len(rates), 3) if rates else 0.0
 
 
-def budget_burn(conn: sqlite3.Connection, project_id: str | None = None) -> list[dict]:
+def budget_burn(
+    conn: sqlite3.Connection,
+    project_id: str | None = None,
+    year_month: str | None = None,
+) -> list[dict]:
     """予算消化率（区分別）
 
     累計実績 / 予算総額 を区分別に計算。
+    year_month 指定時はその月までの累積、None なら全期間累積。
     """
-    where = "WHERE pb.project_id = ?" if project_id else ""
-    params: tuple = (project_id,) if project_id else ()
+    where_clauses = []
+    params: list = []
+
+    ba_conditions: list[str] = []
+    ba_params: list = []
+
+    if project_id:
+        where_clauses.append("pb.project_id = ?")
+        params.append(project_id)
+        ba_conditions.append("project_id = ?")
+        ba_params.append(project_id)
+
+    if year_month:
+        ba_conditions.append("year_month <= ?")
+        ba_params.append(year_month)
+
+    ba_where = ("WHERE " + " AND ".join(ba_conditions)) if ba_conditions else ""
+    where = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
     rows = conn.execute(
         f"""
@@ -107,12 +128,13 @@ def budget_burn(conn: sqlite3.Connection, project_id: str | None = None) -> list
                 SUM(actual_outsource_cost) AS sum_outsource,
                 SUM(actual_expense) AS sum_expense
             FROM budget_actual
+            {ba_where}
             GROUP BY project_id
         ) ba ON p.id = ba.project_id
         {where}
         ORDER BY burn_rate_total DESC
     """,
-        params,
+        ba_params + params,
     ).fetchall()
     return [dict(r) for r in rows]
 
