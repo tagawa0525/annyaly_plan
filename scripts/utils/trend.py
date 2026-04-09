@@ -2,7 +2,7 @@
 
 import sqlite3
 
-from utils.kpi import dept_utilization, budget_burn, progress_gap
+from utils.kpi import dept_utilization, budget_burn
 
 
 def _month_range(start_month: str, end_month: str) -> list[str]:
