@@ -286,7 +286,22 @@ def revenue_forecast_weighted(
     """,
         (period_start, period_end),
     ).fetchall()
-    by_status = [dict(r) for r in rows]
+    # 全契約状態を0で初期化し、クエリ結果で上書き
+    status_order = ["signed", "planned", "delayed"]
+    by_status_map = {
+        status: {
+            "contract_status": status,
+            "project_count": 0,
+            "planned_revenue": 0,
+        }
+        for status in status_order
+    }
+    for row in rows:
+        r = dict(row)
+        status = r["contract_status"]
+        if status in by_status_map:
+            by_status_map[status] = r
+    by_status = [by_status_map[s] for s in status_order]
 
     # 状態別の売上をdictに変換
     revenue_by_status = {s["contract_status"]: s["planned_revenue"] for s in by_status}

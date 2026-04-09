@@ -126,6 +126,24 @@ class TestByStatus(ForecastTestBase):
         statuses = {s["contract_status"] for s in result["by_status"]}
         self.assertEqual(statuses, {"signed", "delayed", "planned"})
 
+    def test_missing_status_returned_with_zero(self):
+        """案件が存在しない契約状態も0件・0円で返される"""
+        self.db.execute(
+            "DELETE FROM budget_plan WHERE project_id = 'P003'"
+        )
+        self.db.execute(
+            "DELETE FROM project_budgets WHERE project_id = 'P003'"
+        )
+        self.db.execute(
+            "DELETE FROM projects WHERE id = 'P003'"
+        )
+        self.db.commit()
+
+        result = revenue_forecast_weighted(self.db)
+        planned = [s for s in result["by_status"] if s["contract_status"] == "planned"][0]
+        self.assertEqual(planned["project_count"], 0)
+        self.assertEqual(planned["planned_revenue"], 0)
+
     def test_signed_revenue(self):
         """signed案件の売上合計"""
         result = revenue_forecast_weighted(self.db)
