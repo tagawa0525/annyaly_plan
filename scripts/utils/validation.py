@@ -1,7 +1,6 @@
 """アサイン整合性チェック - ロジック"""
 
 import sqlite3
-from datetime import datetime
 
 
 def check_allocation_exceeded(
@@ -53,8 +52,14 @@ def check_dispatch_outside_contract(conn: sqlite3.Connection) -> list[dict]:
         JOIN assignments_plan ap ON m.id = ap.member_id
         WHERE m.type = 'dispatch'
           AND (
-              (ap.year_month || '-01' < m.contract_start AND m.contract_start IS NOT NULL)
-              OR (ap.year_month || '-01' > m.contract_end AND m.contract_end IS NOT NULL)
+              (
+                  date(ap.year_month || '-01', '+1 month', '-1 day') < m.contract_start
+                  AND m.contract_start IS NOT NULL
+              )
+              OR (
+                  ap.year_month || '-01' > m.contract_end
+                  AND m.contract_end IS NOT NULL
+              )
           )
     """
     ).fetchall()
@@ -110,15 +115,6 @@ def check_unassigned_active_project(
 ) -> list[dict]:
     """#4 未アサイン案件 (in_progress/planned で対象月のアサインなし)"""
     issues = []
-    # Parse year_month to get the first and last day of the month
-    year, month = year_month.split("-")
-    first_day = f"{year_month}-01"
-    # Calculate last day of month
-    if month == "12":
-        last_day = f"{int(year) + 1}-01-01"
-    else:
-        next_month = int(month) + 1
-        last_day = f"{year}-{next_month:02d}-01"
 
     rows = conn.execute(
         """
@@ -128,12 +124,12 @@ def check_unassigned_active_project(
             p.status
         FROM projects p
         WHERE p.status IN ('in_progress', 'planned')
-          AND p.actual_work_start <= ?
+          AND p.actual_work_start <= date(? || '-01', '+1 month', '-1 day')
           AND p.id NOT IN (
               SELECT DISTINCT project_id FROM assignments_plan WHERE year_month = ?
           )
     """,
-        (first_day, year_month),
+        (year_month, year_month),
     ).fetchall()
 
     for row in rows:
@@ -186,47 +182,48 @@ def check_pto_exceeded(conn: sqlite3.Connection) -> list[dict]:
 def check_missing_capacity(conn: sqlite3.Connection) -> list[dict]:
     """#6 キャパシティ未定義 (active members with no capacity for given month)"""
     issues = []
-    # First find all months that have any assignment or are current
-    distinct_months = conn.execute(
+    rows = conn.execute(
         """
-        SELECT DISTINCT year_month FROM assignments_plan
-        UNION
-        SELECT DISTINCT year_month FROM member_capacity
+        WITH months AS (
+            SELECT DISTINCT year_month FROM assignments_plan
+            UNION
+            SELECT DISTINCT year_month FROM member_capacity
+        )
+        SELECT
+            m.id,
+            m.name,
+            months.year_month
+        FROM months
+        JOIN members m
+            ON (
+                m.type = 'internal'
+                OR (
+                    m.type = 'dispatch'
+                    AND m.contract_start <= date(months.year_month || '-01', '+1 month', '-1 day')
+                    AND (
+                        m.contract_end IS NULL
+                        OR m.contract_end >= months.year_month || '-01'
+                    )
+                )
+            )
+        LEFT JOIN member_capacity mc
+            ON mc.member_id = m.id
+           AND mc.year_month = months.year_month
+        WHERE mc.member_id IS NULL
+        ORDER BY months.year_month, m.id
     """
     ).fetchall()
 
-    months = [dict(m)["year_month"] for m in distinct_months]
-
-    # Check for active members missing capacity in these months
-    for month in months:
-        rows = conn.execute(
-            """
-            SELECT
-                m.id,
-                m.name,
-                ?  AS year_month
-            FROM members m
-            WHERE (m.type = 'internal'
-                   OR (m.type = 'dispatch'
-                       AND m.contract_start <= ? || '-01'
-                       AND (m.contract_end IS NULL OR m.contract_end >= ? || '-01')))
-              AND m.id NOT IN (
-                  SELECT member_id FROM member_capacity WHERE year_month = ?
-              )
-        """,
-            (month, month, month, month),
-        ).fetchall()
-
-        for row in rows:
-            r = dict(row)
-            issues.append(
-                {
-                    "level": "注意",
-                    "type": "キャパシティ未定義",
-                    "message": f"{r['name']} ({r['id']}): {r['year_month']}の capacity が未定義",
-                    "year_month": r["year_month"],
-                }
-            )
+    for row in rows:
+        r = dict(row)
+        issues.append(
+            {
+                "level": "注意",
+                "type": "キャパシティ未定義",
+                "message": f"{r['name']} ({r['id']}): {r['year_month']}の capacity が未定義",
+                "year_month": r["year_month"],
+            }
+        )
 
     return issues
 

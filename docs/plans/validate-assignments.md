@@ -71,7 +71,7 @@ CLAUDE.md のルールに従い、以下の順序でコミットする:
 
 ```bash
 # テスト実行
-python -m pytest tests/test_validation.py -v
+python -m unittest discover -s tests -p 'test_validation.py' -v
 
 # シードデータでの動作確認
 python scripts/seed_sample.py

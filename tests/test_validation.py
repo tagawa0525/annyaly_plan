@@ -313,12 +313,10 @@ class TestUnassignedProject(ValidationTestBase):
 
     def test_planned_project_no_assignment_yet_ok(self):
         """正常: 計画段階の案件はまだアサイン不要"""
-        # P002 is planned, so maybe no assignment is expected in early months
-        # Actually, let me check the logic - 'planned' and 'in_progress' should be checked
-        # P002 starts 2026-08-01 (actual_work_start), so 2026-04 is before start
+        # P002 は planned かつ actual_work_start が 2026-08-01 のため、
+        # 開始前の 2026-04 時点では未アサイン警告の対象にしない
         issues = check_unassigned_active_project(self.db, "2026-04")
         p002_issues = [i for i in issues if "P002" in str(i)]
-        # Should be 0 because actual_work_start is 2026-08-01, after 2026-04
         self.assertEqual(len(p002_issues), 0)
 
 
