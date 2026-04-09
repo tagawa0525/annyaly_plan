@@ -118,14 +118,14 @@ def export_csv(conn, start, end, output_dir: Path) -> None:
 
     # Utilization CSV
     util_data = utilization_trend(conn, start, end)
-    with open(output_dir / "trend_utilization.csv", "w", newline="") as f:
+    with open(output_dir / "trend_utilization.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=["year_month", "rate"])
         writer.writeheader()
         writer.writerows(util_data)
 
     # Budget CSV
     budget_data = budget_trend(conn, start, end)
-    with open(output_dir / "trend_budget.csv", "w", newline="") as f:
+    with open(output_dir / "trend_budget.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f,
             fieldnames=[
@@ -142,7 +142,7 @@ def export_csv(conn, start, end, output_dir: Path) -> None:
     prog_data = progress_trend(conn, start, end)
     if prog_data:
         all_months = sorted(set(ym for d in prog_data for ym in d["months"]))
-        with open(output_dir / "trend_progress.csv", "w", newline="") as f:
+        with open(output_dir / "trend_progress.csv", "w", newline="", encoding="utf-8") as f:
             fieldnames = ["project_id", "project_name"] + all_months
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
