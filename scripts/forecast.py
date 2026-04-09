@@ -50,7 +50,11 @@ def main() -> None:
     labels = {"optimistic": "楽観", "standard": "標準", "pessimistic": "悲観"}
     for key, label in labels.items():
         s = result["scenarios"][key]
-        rate = f"{s['achievement_rate'] * 100:.1f}%" if s["achievement_rate"] else "-"
+        rate = (
+            f"{s['achievement_rate'] * 100:.1f}%"
+            if s["achievement_rate"] is not None
+            else "-"
+        )
         print(f"  {label:<12}{s['forecast_revenue']:>14,}  {rate:>8}")
 
 
