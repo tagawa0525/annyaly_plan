@@ -3,11 +3,11 @@
 import sqlite3
 from pathlib import Path
 import sys
+import unittest
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-import pytest
 from utils.validation import (
     check_allocation_exceeded,
     check_dispatch_outside_contract,
@@ -21,96 +21,98 @@ from utils.validation import (
 from init_db import DDL, VIEWS
 
 
-@pytest.fixture
-def db() -> sqlite3.Connection:
-    """In-memory SQLite database with schema initialized"""
-    conn = sqlite3.connect(":memory:")
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.row_factory = sqlite3.Row
-    conn.executescript(DDL)
-    conn.executescript(VIEWS)
-    conn.commit()
-    yield conn
-    conn.close()
+class ValidationTestBase(unittest.TestCase):
+    """Test base with setup/teardown for in-memory DB"""
 
+    def setUp(self):
+        """Create in-memory database with schema"""
+        self.db = sqlite3.connect(":memory:")
+        self.db.execute("PRAGMA foreign_keys = ON")
+        self.db.row_factory = sqlite3.Row
+        self.db.executescript(DDL)
+        self.db.executescript(VIEWS)
+        self.db.commit()
+        self._setup_base_data()
 
-@pytest.fixture
-def db_with_base_data(db: sqlite3.Connection) -> sqlite3.Connection:
-    """Database with basic master data and calendar"""
-    # Fiscal year
-    db.execute(
-        "INSERT INTO fiscal_year VALUES (?, ?, ?, ?, ?)",
-        (2026, "2026-04-01", "2027-03-31", 200000000, 15),
-    )
+    def tearDown(self):
+        """Close database"""
+        self.db.close()
 
-    # Calendar (12 months)
-    for m in range(1, 13):
-        year_month = f"2026-{m:02d}"
-        working_days = 20  # Default
-        db.execute(
-            "INSERT INTO monthly_calendar VALUES (?, ?)",
-            (year_month, working_days),
+    def _setup_base_data(self):
+        """Initialize base data (fiscal year, calendar, members, projects)"""
+        # Fiscal year
+        self.db.execute(
+            "INSERT INTO fiscal_year VALUES (?, ?, ?, ?, ?)",
+            (2026, "2026-04-01", "2027-03-31", 200000000, 15),
         )
 
-    # Members
-    db.execute(
-        """INSERT INTO members VALUES
-        ('M001', '田中太郎', 'internal', 'PM', 'senior', 800000, NULL, 1.0, 0, '2020-01-01', NULL, NULL, NULL)
-        """
-    )
-    db.execute(
-        """INSERT INTO members VALUES
-        ('M002', '佐藤次郎', 'internal', 'SE', 'mid', 600000, NULL, 1.0, 0, '2020-06-01', NULL, NULL, NULL)
-        """
-    )
-    db.execute(
-        """INSERT INTO members VALUES
-        ('D001', '鈴木花子', 'dispatch', 'SE', 'mid', 0, 4000, 1.0, 0, NULL, '2026-06-01', '2026-12-31', NULL)
-        """
-    )
-
-    # Projects
-    db.execute(
-        """INSERT INTO projects VALUES
-        ('P001', 'A社基幹システム刷新', 'A社', 'in_progress', 'high', '2026-04-01', '2027-03-31',
-         'M001', 'signed', '2026-04-01', '2026-04-01', NULL, 50000000, NULL, NULL)
-        """
-    )
-    db.execute(
-        """INSERT INTO projects VALUES
-        ('P002', 'B社会計システム導入', 'B社', 'planned', 'medium', '2026-08-01', '2027-03-31',
-         'M001', 'delayed', '2026-06-01', '2026-08-01', NULL, 30000000, NULL, NULL)
-        """
-    )
-    db.execute(
-        """INSERT INTO projects VALUES
-        ('P003', 'C社ECサイト構築', 'C社', 'completed', 'medium', '2025-01-01', '2026-03-31',
-         'M002', 'signed', '2025-01-01', '2025-01-01', NULL, 20000000, NULL, NULL)
-        """
-    )
-
-    # Project budgets
-    db.execute(
-        "INSERT INTO project_budgets VALUES ('P001', 40000000, 5000000, 5000000)",
-    )
-    db.execute(
-        "INSERT INTO project_budgets VALUES ('P002', 20000000, 5000000, 5000000)",
-    )
-    db.execute(
-        "INSERT INTO project_budgets VALUES ('P003', 15000000, 3000000, 2000000)",
-    )
-
-    # Member capacity (basic data for all members x all months)
-    for m in range(1, 13):
-        year_month = f"2026-{m:02d}"
-        for member_id in ["M001", "M002", "D001"]:
-            db.execute(
-                "INSERT INTO member_capacity VALUES (?, ?, 0, 0)",
-                (member_id, year_month),
+        # Calendar (12 months)
+        for m in range(1, 13):
+            year_month = f"2026-{m:02d}"
+            working_days = 20  # Default
+            self.db.execute(
+                "INSERT INTO monthly_calendar VALUES (?, ?)",
+                (year_month, working_days),
             )
 
-    db.commit()
-    return db
+        # Members
+        self.db.execute(
+            """INSERT INTO members VALUES
+            ('M001', '田中太郎', 'internal', 'PM', 'senior', 800000, NULL, 1.0, 0, '2020-01-01', NULL, NULL, NULL)
+            """
+        )
+        self.db.execute(
+            """INSERT INTO members VALUES
+            ('M002', '佐藤次郎', 'internal', 'SE', 'mid', 600000, NULL, 1.0, 0, '2020-06-01', NULL, NULL, NULL)
+            """
+        )
+        self.db.execute(
+            """INSERT INTO members VALUES
+            ('D001', '鈴木花子', 'dispatch', 'SE', 'mid', 0, 4000, 1.0, 0, NULL, '2026-06-01', '2026-12-31', NULL)
+            """
+        )
+
+        # Projects
+        self.db.execute(
+            """INSERT INTO projects VALUES
+            ('P001', 'A社基幹システム刷新', 'A社', 'in_progress', 'high', '2026-04-01', '2027-03-31',
+             'M001', 'signed', '2026-04-01', '2026-04-01', NULL, 50000000, NULL, NULL)
+            """
+        )
+        self.db.execute(
+            """INSERT INTO projects VALUES
+            ('P002', 'B社会計システム導入', 'B社', 'planned', 'medium', '2026-08-01', '2027-03-31',
+             'M001', 'delayed', '2026-06-01', '2026-08-01', NULL, 30000000, NULL, NULL)
+            """
+        )
+        self.db.execute(
+            """INSERT INTO projects VALUES
+            ('P003', 'C社ECサイト構築', 'C社', 'completed', 'medium', '2025-01-01', '2026-03-31',
+             'M002', 'signed', '2025-01-01', '2025-01-01', NULL, 20000000, NULL, NULL)
+            """
+        )
+
+        # Project budgets
+        self.db.execute(
+            "INSERT INTO project_budgets VALUES ('P001', 40000000, 5000000, 5000000)",
+        )
+        self.db.execute(
+            "INSERT INTO project_budgets VALUES ('P002', 20000000, 5000000, 5000000)",
+        )
+        self.db.execute(
+            "INSERT INTO project_budgets VALUES ('P003', 15000000, 3000000, 2000000)",
+        )
+
+        # Member capacity (basic data for all members x all months)
+        for m in range(1, 13):
+            year_month = f"2026-{m:02d}"
+            for member_id in ["M001", "M002", "D001"]:
+                self.db.execute(
+                    "INSERT INTO member_capacity VALUES (?, ?, 0, 0)",
+                    (member_id, year_month),
+                )
+
+        self.db.commit()
 
 
 # ========================
@@ -118,65 +120,63 @@ def db_with_base_data(db: sqlite3.Connection) -> sqlite3.Connection:
 # ========================
 
 
-class TestAllocationExceeded:
-    def test_normal_allocation(self, db_with_base_data):
+class TestAllocationExceeded(ValidationTestBase):
+    def test_normal_allocation(self):
         """正常: 1.0以下"""
-        db = db_with_base_data
-        db.execute(
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
             ("M001", "P001", "2026-04", 0.5, "PM"),
         )
-        db.execute(
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
             ("M001", "P002", "2026-04", 0.4, "PM"),
         )
-        db.commit()
+        self.db.commit()
 
-        issues = check_allocation_exceeded(db, "2026-04")
-        assert len(issues) == 0
+        issues = check_allocation_exceeded(self.db, "2026-04")
+        self.assertEqual(len(issues), 0)
 
-    def test_allocation_at_limit(self, db_with_base_data):
+    def test_allocation_at_limit(self):
         """正常: ちょうど1.0"""
-        db = db_with_base_data
-        db.execute(
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
             ("M001", "P001", "2026-04", 1.0, "PM"),
         )
-        db.commit()
+        self.db.commit()
 
-        issues = check_allocation_exceeded(db, "2026-04")
-        assert len(issues) == 0
+        issues = check_allocation_exceeded(self.db, "2026-04")
+        self.assertEqual(len(issues), 0)
 
-    def test_allocation_exceeded(self, db_with_base_data):
+    def test_allocation_exceeded(self):
         """異常: 1.0超過"""
-        db = db_with_base_data
-        db.execute(
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
             ("M001", "P001", "2026-04", 0.7, "PM"),
         )
-        db.execute(
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
             ("M001", "P002", "2026-04", 0.4, "PM"),
         )
-        db.commit()
+        self.db.commit()
 
-        issues = check_allocation_exceeded(db, "2026-04")
-        assert len(issues) == 1
-        assert issues[0]["level"] == "警告"
-        assert "M001" in issues[0]["message"]
-        assert "1.1" in issues[0]["message"]
+        issues = check_allocation_exceeded(self.db, "2026-04")
+        self.assertEqual(len(issues), 1)
+        self.assertEqual(issues[0]["level"], "警告")
+        self.assertIn("M001", issues[0]["message"])
+        self.assertIn("1.1", issues[0]["message"])
 
-    def test_allocation_at_max(self, db_with_base_data):
-        """正常: 上限1.5"""
-        db = db_with_base_data
-        db.execute(
+    def test_allocation_at_max(self):
+        """異常: 上限1.5は1.0超なので警告"""
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
             ("M001", "P001", "2026-04", 1.5, "PM"),
         )
-        db.commit()
+        self.db.commit()
 
-        issues = check_allocation_exceeded(db, "2026-04")
-        assert len(issues) == 0
+        issues = check_allocation_exceeded(self.db, "2026-04")
+        # 1.5 > 1.0 なので警告が出る
+        self.assertEqual(len(issues), 1)
+        self.assertEqual(issues[0]["level"], "警告")
 
 
 # ========================
@@ -184,51 +184,50 @@ class TestAllocationExceeded:
 # ========================
 
 
-class TestDispatchOutsideContract:
-    def test_dispatch_within_contract(self, db_with_base_data):
+class TestDispatchOutsideContract(ValidationTestBase):
+    def test_dispatch_within_contract(self):
         """正常: 契約期間内"""
-        db = db_with_base_data
         # D001: 2026-06-01 ～ 2026-12-31
-        db.execute(
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
             ("D001", "P001", "2026-06", 1.0, "SE"),
         )
-        db.execute(
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
             ("D001", "P001", "2026-12", 1.0, "SE"),
         )
-        db.commit()
+        self.db.commit()
 
-        issues = check_dispatch_outside_contract(db)
-        assert len(issues) == 0
+        issues = check_dispatch_outside_contract(self.db)
+        self.assertEqual(len(issues), 0)
 
-    def test_dispatch_before_contract(self, db_with_base_data):
+    def test_dispatch_before_contract(self):
         """異常: 契約開始前にアサイン"""
-        db = db_with_base_data
         # D001: 2026-06-01 契約開始なのに、2026-04, 2026-05 にアサイン
-        db.execute(
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
             ("D001", "P001", "2026-04", 1.0, "SE"),
         )
-        db.commit()
+        self.db.commit()
 
-        issues = check_dispatch_outside_contract(db)
-        assert len(issues) == 1
-        assert issues[0]["level"] == "警告"
-        assert "D001" in issues[0]["message"] or "鈴木花子" in issues[0]["message"]
+        issues = check_dispatch_outside_contract(self.db)
+        self.assertEqual(len(issues), 1)
+        self.assertEqual(issues[0]["level"], "警告")
+        self.assertTrue(
+            "D001" in issues[0]["message"] or "鈴木花子" in issues[0]["message"]
+        )
 
-    def test_dispatch_after_contract(self, db_with_base_data):
+    def test_dispatch_after_contract(self):
         """異常: 契約終了後にアサイン"""
-        db = db_with_base_data
         # D001: 2026-12-31 契約終了なのに、2027-01 にアサイン
-        db.execute(
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
             ("D001", "P001", "2027-01", 1.0, "SE"),
         )
-        db.commit()
+        self.db.commit()
 
-        issues = check_dispatch_outside_contract(db)
-        assert len(issues) == 1
+        issues = check_dispatch_outside_contract(self.db)
+        self.assertEqual(len(issues), 1)
 
 
 # ========================
@@ -236,55 +235,54 @@ class TestDispatchOutsideContract:
 # ========================
 
 
-class TestAssignmentToClosed:
-    def test_assignment_to_active_project(self, db_with_base_data):
+class TestAssignmentToClosed(ValidationTestBase):
+    def test_assignment_to_active_project(self):
         """正常: 進行中の案件へアサイン"""
-        db = db_with_base_data
         # P001 is in_progress
-        db.execute(
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
             ("M001", "P001", "2026-04", 1.0, "PM"),
         )
-        db.commit()
+        self.db.commit()
 
-        issues = check_assignment_to_closed_project(db)
-        assert len(issues) == 0
+        issues = check_assignment_to_closed_project(self.db)
+        self.assertEqual(len(issues), 0)
 
-    def test_assignment_to_completed_project(self, db_with_base_data):
+    def test_assignment_to_completed_project(self):
         """異常: 完了済み案件へアサイン"""
-        db = db_with_base_data
         # P003 is completed
-        db.execute(
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
             ("M001", "P003", "2026-04", 1.0, "PM"),
         )
-        db.commit()
+        self.db.commit()
 
-        issues = check_assignment_to_closed_project(db)
-        assert len(issues) == 1
-        assert issues[0]["level"] == "警告"
-        assert "P003" in issues[0]["message"] or "C社ECサイト" in issues[0]["message"]
+        issues = check_assignment_to_closed_project(self.db)
+        self.assertEqual(len(issues), 1)
+        self.assertEqual(issues[0]["level"], "警告")
+        self.assertTrue(
+            "P003" in issues[0]["message"] or "C社ECサイト" in issues[0]["message"]
+        )
 
-    def test_assignment_to_cancelled_project(self, db_with_base_data):
+    def test_assignment_to_cancelled_project(self):
         """異常: キャンセル案件へアサイン"""
-        db = db_with_base_data
-        db.execute(
+        self.db.execute(
             """INSERT INTO projects VALUES
             ('P004', 'D社システム', 'D社', 'cancelled', 'low', '2026-05-01', '2026-06-30',
              NULL, 'planned', '2026-05-01', '2026-05-01', NULL, 10000000, NULL, NULL)
             """
         )
-        db.execute(
+        self.db.execute(
             "INSERT INTO project_budgets VALUES ('P004', 5000000, 2000000, 1000000)",
         )
-        db.execute(
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
             ("M001", "P004", "2026-05", 0.5, "PM"),
         )
-        db.commit()
+        self.db.commit()
 
-        issues = check_assignment_to_closed_project(db)
-        assert len(issues) == 1
+        issues = check_assignment_to_closed_project(self.db)
+        self.assertEqual(len(issues), 1)
 
 
 # ========================
@@ -292,39 +290,36 @@ class TestAssignmentToClosed:
 # ========================
 
 
-class TestUnassignedProject:
-    def test_active_project_with_assignment(self, db_with_base_data):
+class TestUnassignedProject(ValidationTestBase):
+    def test_active_project_with_assignment(self):
         """正常: 進行中案件にアサインあり"""
-        db = db_with_base_data
-        db.execute(
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
             ("M001", "P001", "2026-04", 1.0, "PM"),
         )
-        db.commit()
+        self.db.commit()
 
-        issues = check_unassigned_active_project(db, "2026-04")
+        issues = check_unassigned_active_project(self.db, "2026-04")
         # P001 has assignment, P002 is not started yet (planned status), no issue
-        assert len([i for i in issues if "P001" in str(i)]) == 0
+        self.assertEqual(len([i for i in issues if "P001" in str(i)]), 0)
 
-    def test_active_project_without_assignment(self, db_with_base_data):
+    def test_active_project_without_assignment(self):
         """異常: 進行中案件にアサインなし"""
-        db = db_with_base_data
         # P001 is in_progress but no assignment in 2026-04
-        issues = check_unassigned_active_project(db, "2026-04")
+        issues = check_unassigned_active_project(self.db, "2026-04")
         p001_issues = [i for i in issues if "P001" in str(i)]
-        assert len(p001_issues) == 1
-        assert p001_issues[0]["level"] == "注意"
+        self.assertEqual(len(p001_issues), 1)
+        self.assertEqual(p001_issues[0]["level"], "注意")
 
-    def test_planned_project_no_assignment_yet_ok(self, db_with_base_data):
+    def test_planned_project_no_assignment_yet_ok(self):
         """正常: 計画段階の案件はまだアサイン不要"""
-        db = db_with_base_data
         # P002 is planned, so maybe no assignment is expected in early months
         # Actually, let me check the logic - 'planned' and 'in_progress' should be checked
         # P002 starts 2026-08-01 (actual_work_start), so 2026-04 is before start
-        issues = check_unassigned_active_project(db, "2026-04")
+        issues = check_unassigned_active_project(self.db, "2026-04")
         p002_issues = [i for i in issues if "P002" in str(i)]
         # Should be 0 because actual_work_start is 2026-08-01, after 2026-04
-        assert len(p002_issues) == 0
+        self.assertEqual(len(p002_issues), 0)
 
 
 # ========================
@@ -332,39 +327,36 @@ class TestUnassignedProject:
 # ========================
 
 
-class TestPtoExceeded:
-    def test_normal_pto(self, db_with_base_data):
+class TestPtoExceeded(ValidationTestBase):
+    def test_normal_pto(self):
         """正常: PTO日数 <= working_days"""
-        db = db_with_base_data
         # Default: planned_pto_days=0, working_days=20
-        issues = check_pto_exceeded(db)
-        assert len(issues) == 0
+        issues = check_pto_exceeded(self.db)
+        self.assertEqual(len(issues), 0)
 
-    def test_pto_exceeded(self, db_with_base_data):
+    def test_pto_exceeded(self):
         """異常: PTO日数 > working_days"""
-        db = db_with_base_data
         # Update M001's April pto to 25 (exceed 20)
-        db.execute(
+        self.db.execute(
             "UPDATE member_capacity SET planned_pto_days = 25 WHERE member_id = 'M001' AND year_month = '2026-04'",
         )
-        db.commit()
+        self.db.commit()
 
-        issues = check_pto_exceeded(db)
+        issues = check_pto_exceeded(self.db)
         pto_issues = [i for i in issues if "M001" in str(i) and "2026-04" in str(i)]
-        assert len(pto_issues) >= 1
-        assert pto_issues[0]["level"] == "警告"
+        self.assertGreaterEqual(len(pto_issues), 1)
+        self.assertEqual(pto_issues[0]["level"], "警告")
 
-    def test_pto_equal_working_days(self, db_with_base_data):
+    def test_pto_equal_working_days(self):
         """正常: PTO日数 = working_days (境界値)"""
-        db = db_with_base_data
-        db.execute(
+        self.db.execute(
             "UPDATE member_capacity SET planned_pto_days = 20 WHERE member_id = 'M001' AND year_month = '2026-04'",
         )
-        db.commit()
+        self.db.commit()
 
-        issues = check_pto_exceeded(db)
+        issues = check_pto_exceeded(self.db)
         pto_issues = [i for i in issues if "M001" in str(i) and "2026-04" in str(i)]
-        assert len(pto_issues) == 0
+        self.assertEqual(len(pto_issues), 0)
 
 
 # ========================
@@ -372,40 +364,37 @@ class TestPtoExceeded:
 # ========================
 
 
-class TestMissingCapacity:
-    def test_capacity_defined_for_all(self, db_with_base_data):
+class TestMissingCapacity(ValidationTestBase):
+    def test_capacity_defined_for_all(self):
         """正常: 全 active メンバーの全月に capacity がある"""
-        db = db_with_base_data
         # Already populated in fixture
-        issues = check_missing_capacity(db)
-        assert len(issues) == 0
+        issues = check_missing_capacity(self.db)
+        self.assertEqual(len(issues), 0)
 
-    def test_missing_capacity_for_month(self, db_with_base_data):
+    def test_missing_capacity_for_month(self):
         """異常: active メンバーで月の capacity が未定義"""
-        db = db_with_base_data
         # Delete M001's April capacity
-        db.execute(
+        self.db.execute(
             "DELETE FROM member_capacity WHERE member_id = 'M001' AND year_month = '2026-04'",
         )
-        db.commit()
+        self.db.commit()
 
-        issues = check_missing_capacity(db)
+        issues = check_missing_capacity(self.db)
         capacity_issues = [
             i for i in issues if "M001" in str(i) and "2026-04" in str(i)
         ]
-        assert len(capacity_issues) == 1
-        assert capacity_issues[0]["level"] == "注意"
+        self.assertEqual(len(capacity_issues), 1)
+        self.assertEqual(capacity_issues[0]["level"], "注意")
 
-    def test_missing_capacity_for_internal_member(self, db_with_base_data):
+    def test_missing_capacity_for_internal_member(self):
         """異常: internal メンバーは capacity が必須"""
-        db = db_with_base_data
-        db.execute(
+        self.db.execute(
             "DELETE FROM member_capacity WHERE member_id = 'M002' AND year_month = '2026-06'",
         )
-        db.commit()
+        self.db.commit()
 
-        issues = check_missing_capacity(db)
-        assert len([i for i in issues if "M002" in str(i)]) >= 1
+        issues = check_missing_capacity(self.db)
+        self.assertGreaterEqual(len([i for i in issues if "M002" in str(i)]), 1)
 
 
 # ========================
@@ -413,31 +402,26 @@ class TestMissingCapacity:
 # ========================
 
 
-class TestMissingCalendar:
-    def test_calendar_defined(self, db_with_base_data):
+class TestMissingCalendar(ValidationTestBase):
+    def test_calendar_defined(self):
         """正常: 全 year_month にカレンダーがある"""
-        db = db_with_base_data
-        issues = check_missing_calendar(db)
-        assert len(issues) == 0
+        issues = check_missing_calendar(self.db)
+        self.assertEqual(len(issues), 0)
 
-    def test_missing_calendar_for_assignment(self, db_with_base_data):
+    def test_missing_calendar_for_assignment(self):
         """異常: assignments_plan の year_month が calendar にない"""
-        db = db_with_base_data
-        # Delete 2026-04 from calendar
-        db.execute("DELETE FROM monthly_calendar WHERE year_month = '2026-04'",)
-        db.commit()
-
-        # Add assignment in 2026-04
-        db.execute(
+        # Add assignment in a month without calendar
+        # Use 2027-01 which doesn't have calendar by default
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
-            ("M001", "P001", "2026-04", 0.5, "PM"),
+            ("M001", "P001", "2027-01", 0.5, "PM"),
         )
-        db.commit()
+        self.db.commit()
 
-        issues = check_missing_calendar(db)
-        cal_issues = [i for i in issues if "2026-04" in str(i)]
-        assert len(cal_issues) == 1
-        assert cal_issues[0]["level"] == "警告"
+        issues = check_missing_calendar(self.db)
+        cal_issues = [i for i in issues if "2027-01" in str(i)]
+        self.assertEqual(len(cal_issues), 1)
+        self.assertEqual(cal_issues[0]["level"], "警告")
 
 
 # ========================
@@ -445,32 +429,40 @@ class TestMissingCalendar:
 # ========================
 
 
-class TestAllValidations:
-    def test_no_issues(self, db_with_base_data):
+class TestAllValidations(ValidationTestBase):
+    def test_no_issues(self):
         """正常: 問題なし"""
-        db = db_with_base_data
-        issues = run_all_validations(db, "2026-04")
-        assert len(issues) == 0
+        # P001はin_progressなのでアサイン必須
+        self.db.execute(
+            "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
+            ("M001", "P001", "2026-04", 0.5, "PM"),
+        )
+        self.db.commit()
+        issues = run_all_validations(self.db, "2026-04")
+        self.assertEqual(len(issues), 0)
 
-    def test_multiple_issues(self, db_with_base_data):
+    def test_multiple_issues(self):
         """異常: 複数の問題を検出"""
-        db = db_with_base_data
         # 1. Allocation exceeded
-        db.execute(
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
             ("M001", "P001", "2026-04", 0.7, "PM"),
         )
-        db.execute(
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
             ("M001", "P002", "2026-04", 0.4, "PM"),
         )
         # 2. Assignment to completed project
-        db.execute(
+        self.db.execute(
             "INSERT INTO assignments_plan VALUES (?, ?, ?, ?, ?)",
             ("M002", "P003", "2026-04", 0.5, "SE"),
         )
-        db.commit()
+        self.db.commit()
 
-        issues = run_all_validations(db, "2026-04")
-        assert len(issues) >= 2
-        assert any(i["level"] == "警告" for i in issues)
+        issues = run_all_validations(self.db, "2026-04")
+        self.assertGreaterEqual(len(issues), 2)
+        self.assertTrue(any(i["level"] == "警告" for i in issues))
+
+
+if __name__ == "__main__":
+    unittest.main()
