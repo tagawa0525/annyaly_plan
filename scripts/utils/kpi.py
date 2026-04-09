@@ -209,7 +209,8 @@ def revenue_forecast(conn: sqlite3.Connection, fiscal_year: int = 2026) -> dict:
             END AS achievement_rate
         FROM fiscal_year fy
         LEFT JOIN budget_plan bp
-            ON bp.year_month >= fy.period_start AND bp.year_month <= substr(fy.period_end, 1, 7)
+            ON bp.year_month >= substr(fy.period_start, 1, 7)
+            AND bp.year_month <= substr(fy.period_end, 1, 7)
         WHERE fy.fiscal_year = ?
     """,
         (fiscal_year,),
