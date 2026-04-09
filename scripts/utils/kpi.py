@@ -296,7 +296,7 @@ def revenue_forecast_weighted(
     for name, weights in SCENARIOS.items():
         forecast = 0
         for status, weight in weights.items():
-            forecast += int(revenue_by_status.get(status, 0) * weight)
+            forecast += int(round(revenue_by_status.get(status, 0) * weight))
         achievement = (
             round(forecast / revenue_target, 3) if revenue_target > 0 else None
         )
