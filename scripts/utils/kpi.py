@@ -238,3 +238,75 @@ def revenue_forecast(conn: sqlite3.Connection, fiscal_year: int = 2026) -> dict:
         (fiscal_year,),
     ).fetchone()
     return dict(row) if row else {}
+
+
+# シナリオ別の重み定義
+SCENARIOS = {
+    "optimistic": {"signed": 1.0, "planned": 1.0, "delayed": 0.8},
+    "standard": {"signed": 1.0, "planned": 0.7, "delayed": 0.5},
+    "pessimistic": {"signed": 1.0, "planned": 0.4, "delayed": 0.2},
+}
+
+
+def revenue_forecast_weighted(
+    conn: sqlite3.Connection, fiscal_year: int = 2026
+) -> dict:
+    """確度別売上予測（3シナリオ）
+
+    契約状態（signed/planned/delayed）に応じた重み付けで
+    楽観・標準・悲観の3シナリオを算出。
+    """
+    # 売上目標
+    fy_row = conn.execute(
+        "SELECT revenue_target, period_start, period_end FROM fiscal_year WHERE fiscal_year = ?",
+        (fiscal_year,),
+    ).fetchone()
+    if not fy_row:
+        return {}
+    fy = dict(fy_row)
+    revenue_target = fy["revenue_target"]
+    period_start = fy["period_start"][:7]
+    period_end = fy["period_end"][:7]
+
+    # 契約状態別の集計
+    rows = conn.execute(
+        """
+        SELECT
+            p.contract_status,
+            COUNT(DISTINCT p.id) AS project_count,
+            COALESCE(SUM(bp.planned_revenue), 0) AS planned_revenue
+        FROM projects p
+        LEFT JOIN budget_plan bp
+            ON bp.project_id = p.id
+            AND bp.year_month >= ?
+            AND bp.year_month <= ?
+        WHERE p.status NOT IN ('cancelled')
+        GROUP BY p.contract_status
+        ORDER BY p.contract_status
+    """,
+        (period_start, period_end),
+    ).fetchall()
+    by_status = [dict(r) for r in rows]
+
+    # 状態別の売上をdictに変換
+    revenue_by_status = {s["contract_status"]: s["planned_revenue"] for s in by_status}
+
+    # シナリオ別予測
+    scenarios = {}
+    for name, weights in SCENARIOS.items():
+        forecast = 0
+        for status, weight in weights.items():
+            forecast += int(revenue_by_status.get(status, 0) * weight)
+        achievement = (
+            round(forecast / revenue_target, 3) if revenue_target > 0 else None
+        )
+        scenarios[name] = {
+            "forecast_revenue": forecast,
+            "achievement_rate": achievement,
+        }
+
+    return {
+        "revenue_target": revenue_target,
+        "by_status": by_status,
+        "scenarios": scenarios,
+    }
