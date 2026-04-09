@@ -27,7 +27,7 @@ TABLES = [
 
 
 def get_primary_key_columns(conn: sqlite3.Connection, table: str) -> list[str]:
-    table_info = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    table_info = conn.execute(f"PRAGMA table_info({table})").fetchall()  # noqa: S608
     return [row[1] for row in sorted(table_info, key=lambda r: r[5]) if row[5] > 0]
 
 
