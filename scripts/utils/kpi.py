@@ -79,16 +79,20 @@ def budget_burn(
     where_clauses = []
     params: list = []
 
+    ba_conditions: list[str] = []
+    ba_params: list = []
+
     if project_id:
         where_clauses.append("pb.project_id = ?")
         params.append(project_id)
+        ba_conditions.append("project_id = ?")
+        ba_params.append(project_id)
 
-    ba_where = ""
-    ba_params: list = []
     if year_month:
-        ba_where = "WHERE year_month <= ?"
+        ba_conditions.append("year_month <= ?")
         ba_params.append(year_month)
 
+    ba_where = ("WHERE " + " AND ".join(ba_conditions)) if ba_conditions else ""
     where = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
     rows = conn.execute(
