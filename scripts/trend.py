@@ -176,7 +176,8 @@ def main() -> None:
     conn = connect()
     try:
         if args.csv:
-            export_csv(conn, start, end, Path("data/export"))
+            export_dir = Path(__file__).resolve().parent.parent / "data" / "export"
+            export_csv(conn, start, end, export_dir)
 
         show_utilization(conn, start, end)
         show_budget(conn, start, end)
