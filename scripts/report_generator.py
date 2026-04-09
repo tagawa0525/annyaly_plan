@@ -14,6 +14,7 @@ from utils.kpi import (
     utilization_by_member,
 )
 from alerts import run_all_alerts
+from utils.ai_comment import generate_ai_comment
 
 REPORT_DIR = Path(__file__).resolve().parent.parent / "reports" / "monthly"
 
@@ -161,10 +162,18 @@ def _generate_report_impl(conn, year_month: str) -> str:
             lines.append(f"- **[{a['level']}]** {a['type']}: {a['message']}")
         lines.append("")
 
-    # AI分析用プレースホルダ
+    # AI分析コメント
     lines.append("## 7. AI分析コメント")
     lines.append("")
-    lines.append("<!-- Claude Code が分析結果に基づき記入 -->")
+    ai_comment = generate_ai_comment(
+        dept_rate=dept_rate,
+        members=members,
+        burns=burns,
+        gaps=gaps,
+        compressed=compressed,
+        alerts=alerts,
+    )
+    lines.append(ai_comment)
     lines.append("")
 
     return "\n".join(lines)
