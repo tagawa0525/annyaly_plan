@@ -43,13 +43,13 @@ def show_utilization(conn, start, end) -> list[list]:
     print_section(f"稼働率トレンド ({start} 〜 {end})")
     data = utilization_trend(conn, start, end)
 
-    print(f"{'月':<10}{'計画':>8}")
+    print(f"{'月':<10}{'稼働率':>8}")
     print(f"{'-' * 10}{'-' * 8}")
     rows = []
     for d in data:
-        rate_str = f"{d['plan_rate'] * 100:.0f}%" if d["plan_rate"] else "-"
+        rate_str = f"{d['rate'] * 100:.0f}%" if d["rate"] else "-"
         print(f"{d['year_month']:<10}{rate_str:>8}")
-        rows.append([d["year_month"], d["plan_rate"]])
+        rows.append([d["year_month"], d["rate"]])
     return rows
 
 
@@ -119,7 +119,7 @@ def export_csv(conn, start, end, output_dir: Path) -> None:
     # Utilization CSV
     util_data = utilization_trend(conn, start, end)
     with open(output_dir / "trend_utilization.csv", "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["year_month", "plan_rate", "actual_rate"])
+        writer = csv.DictWriter(f, fieldnames=["year_month", "rate"])
         writer.writeheader()
         writer.writerows(util_data)
 

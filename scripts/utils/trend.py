@@ -24,7 +24,10 @@ def utilization_trend(
 ) -> list[dict]:
     """稼働率トレンド: 各月の部署平均稼働率を計算
 
-    Returns: [{year_month, plan_rate, actual_rate}, ...]
+    dept_utilization は実績データがあれば実績を優先するため、
+    返す rate は計画/実績の混合値。
+
+    Returns: [{year_month, rate}, ...]
     """
     results = []
     for ym in _month_range(start_month, end_month):
@@ -32,8 +35,7 @@ def utilization_trend(
         results.append(
             {
                 "year_month": ym,
-                "plan_rate": rate,
-                "actual_rate": None,  # 実績があれば別途計算
+                "rate": rate,
             }
         )
     return results

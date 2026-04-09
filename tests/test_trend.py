@@ -175,12 +175,12 @@ class TestUtilizationTrend(TrendTestBase):
         self.assertEqual(results[0]["year_month"], "2026-04")
         self.assertEqual(results[2]["year_month"], "2026-06")
 
-    def test_plan_rate_present(self):
-        """計画稼働率が含まれる"""
+    def test_rate_present(self):
+        """稼働率が含まれる"""
         results = utilization_trend(self.db, "2026-04", "2026-04")
         self.assertEqual(len(results), 1)
         # M001=0.5, M002=0.8 → avg = 0.65
-        self.assertGreater(results[0]["plan_rate"], 0)
+        self.assertGreater(results[0]["rate"], 0)
 
     def test_empty_range(self):
         """範囲外の月は空"""
