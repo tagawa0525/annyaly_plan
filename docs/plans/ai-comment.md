@@ -51,15 +51,18 @@ def generate_ai_comment(
 ## TDDサイクル
 
 ### コミット1: RED - テスト作成
+
 - `tests/test_ai_comment.py`
 - 正常データでの総合評価テスト
 - アラートなし/あり時のコメント内容テスト
 - 各セクション（稼働/予算/進捗）の生成テスト
 
 ### コミット2: GREEN - ロジック実装
+
 - `scripts/utils/ai_comment.py` にコメント生成ロジック
 
 ### コミット3: GREEN - report_generator.py 改修
+
 - プレースホルダーを生成コメントで置換
 
 ## 関連ファイル
