@@ -52,7 +52,7 @@ def _utilization_comment(dept_rate: float, members: list[dict]) -> str:
     return comment
 
 
-def _budget_comment(burns: list[dict]) -> str | None:
+def _budget_comment(burns: list[dict]) -> str:
     """予算状況のコメントを生成"""
     issues = []
     for b in burns:
@@ -71,7 +71,7 @@ def _budget_comment(burns: list[dict]) -> str | None:
     return "全案件の消化ペースは適正"
 
 
-def _progress_comment(gaps: list[dict], compressed: list[dict]) -> str | None:
+def _progress_comment(gaps: list[dict], compressed: list[dict]) -> str:
     """進捗状況のコメントを生成"""
     comments = []
 
