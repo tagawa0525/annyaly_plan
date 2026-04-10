@@ -39,6 +39,22 @@ class TestOverallAssessment(unittest.TestCase):
         )
         self.assertIn("注意", result)
 
+    def test_caution_when_only_cautions(self):
+        """注意のみ → 注意（良好にしない）"""
+        alerts = [
+            {"level": "注意", "type": "派遣契約期限", "message": "D001: 残60日"},
+        ]
+        result = generate_ai_comment(
+            dept_rate=0.8,
+            members=[],
+            burns=[],
+            gaps=[],
+            compressed=[],
+            alerts=alerts,
+        )
+        self.assertIn("注意", result)
+        self.assertNotIn("良好", result)
+
     def test_critical_when_danger(self):
         """危険あり → 要対応"""
         alerts = [

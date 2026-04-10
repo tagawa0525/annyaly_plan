@@ -9,26 +9,20 @@ def _assess_level(alerts: list[dict]) -> tuple[str, str]:
 
     if critical > 0:
         level = "要対応"
-        parts = []
-        if critical:
-            parts.append(f"危険{critical}件")
-        if warnings:
-            parts.append(f"警告{warnings}件")
-        if cautions:
-            parts.append(f"注意{cautions}件")
-        summary = "、".join(parts) + "を検出"
-    elif warnings > 0:
-        parts = []
-        if warnings:
-            parts.append(f"警告{warnings}件")
-        if cautions:
-            parts.append(f"注意{cautions}件")
+    elif warnings > 0 or cautions > 0:
         level = "注意"
-        summary = "、".join(parts) + "を検出"
     else:
         level = "良好"
-        summary = "重大な問題なし"
+        return level, "重大な問題なし"
 
+    parts = []
+    if critical:
+        parts.append(f"危険{critical}件")
+    if warnings:
+        parts.append(f"警告{warnings}件")
+    if cautions:
+        parts.append(f"注意{cautions}件")
+    summary = "、".join(parts) + "を検出"
     return level, summary
 
 
